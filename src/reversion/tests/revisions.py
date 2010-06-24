@@ -1,6 +1,6 @@
 from reversion import revisions
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 import random
 import datetime
 
@@ -173,5 +173,85 @@ class TestOfRevisionManager(TestCase):
         manager.end()
         self.assertEqual(len(revisions.Version.objects.all()), 1)
 
+    def test_follow_relationships_follows_m2m_relationships(self):
+        manager = revisions.RevisionManager()
+        manager.register(User, follow=('groups',))
+        manager.register(Group)
+        user = User.objects.create(username='rand%d'%random.randint(1, 100))
+        random_group_membership = random.randint(1, 100)
+        groups = [user.groups.create(
+            name='rand%d'%i
+        ) for i in range(random_group_membership)]
+        results = manager.follow_relationships(set([user]))
 
+        # add 1 to represent the User
+        self.assertEqual(len(results), random_group_membership + 1)
+        for group in groups:
+            self.assertTrue(group in results)
+        self.assertTrue(user in results)
 
+    def test_follow_relationships_follows_proxy_relationships(self):
+        manager = revisions.RevisionManager()
+        manager.register(User, follow=('groups',))
+        manager.register(Group)
+        class AbUser(User):
+            class Meta:
+                proxy = True
+        manager.register(AbUser)
+        user = AbUser.objects.create(username='rand%d'%random.randint(1, 100))
+        random_group_membership = random.randint(1, 100)
+        groups = [user.groups.create(
+            name='rand%d'%i
+        ) for i in range(random_group_membership)]
+        results = manager.follow_relationships(set([user]))
+
+        # add 2, 1 for the AbUser entry, and one for the User parent of that AbUser
+        self.assertEqual(len(results), random_group_membership + 2)
+        for group in groups:
+            self.assertTrue(group in results)
+        self.assertTrue(user in results)
+
+    def test_follow_relationships_raises_registrationerror_if_followed_group_isnt_registered(self):
+        manager = revisions.RevisionManager()
+        manager.register(User, follow=('groups',))
+        user = User.objects.create(username='rand%d'%random.randint(1, 100))
+        random_group_membership = random.randint(1, 100)
+        groups = [user.groups.create(
+            name='rand%d'%i
+        ) for i in range(random_group_membership)]
+        self.assertRaises(revisions.RegistrationError, manager.follow_relationships, set([user]))
+        user.groups.all().delete()
+
+        # THIS IS A HUGE GOTCHA:
+        #   if it doesn't run into any of the non-registered items, it DOESN'T ERROR OUT
+        #   bad, bad, BAD
+        self.assertEqual(manager.follow_relationships(set([user])), set([user]))
+
+    def test_follow_relationships_raises_a_typeerror_on_non_related_follow_fields(self):
+        manager = revisions.RevisionManager()
+        user_methods = [i for i in dir(User) if isinstance(getattr(User, i), type(User.get_profile))]
+        user_method = user_methods[random.randint(0,len(user_methods)-1)]
+
+        manager.register(User, follow=(user_method,))
+        user = User.objects.create(username='rand%d'%random.randint(1, 100))
+        self.assertRaises(TypeError, manager.follow_relationships, set([user]))
+
+    def test_follow_relationships_returns_only_distinct_objects(self):
+        manager = revisions.RevisionManager()
+        manager.register(User, follow=('groups',))
+        manager.register(Group)
+        user = User.objects.create(username='rand%d'%random.randint(1, 100))
+        user2 = User.objects.create(username='rand%d-2'%random.randint(1, 100))
+        random_group_membership = random.randint(1, 100)
+        groups = [user.groups.create(
+            name='rand%d'%i
+        ) for i in range(random_group_membership)]
+        [user2.groups.add(group) for group in groups]
+        results = manager.follow_relationships(set([user, user2]))
+
+        # add 1 to represent the User
+        self.assertEqual(len(results), random_group_membership + 2)
+        for group in groups:
+            self.assertTrue(group in results)
+        self.assertTrue(user in results)
+        self.assertTrue(user2 in results)
