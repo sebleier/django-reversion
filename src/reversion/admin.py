@@ -24,7 +24,6 @@ import reversion
 from reversion.models import Version
 from reversion.revisions import DEFAULT_SERIALIZATION_FORMAT
 
-
 class VersionAdmin(admin.ModelAdmin):
     
     """Abstract admin class for handling version controlled models."""
@@ -38,6 +37,8 @@ class VersionAdmin(admin.ModelAdmin):
     recover_list_template = "reversion/recover_list.html"
     
     recover_form_template = "reversion/recover_form.html"
+
+    diff_view_template = "reversion/diff_list.html"
     
     # The serialization format to use when registering models with reversion.
     reversion_format = DEFAULT_SERIALIZATION_FORMAT
@@ -87,9 +88,37 @@ class VersionAdmin(admin.ModelAdmin):
         reversion_urls = patterns("",
                                   url("^recover/$", admin_site.admin_view(self.recoverlist_view), name='%s_%s_recoverlist' % info),
                                   url("^recover/([^/]+)/$", admin_site.admin_view(self.recover_view), name='%s_%s_recover' % info),
-                                  url("^([^/]+)/history/([^/]+)/$", admin_site.admin_view(self.revision_view), name='%s_%s_revision' % info),)
+                                  url("^([^/]+)/history/([^/]+)/$", admin_site.admin_view(self.revision_view), name='%s_%s_revision' % info),
+                                  url("^([^/]+)/diff/(?P<lhs_version>\d+)/(?P<rhs_version>\d+)/$", admin_site.admin_view(self.diff_list), name='%s_%s_diff' % info),
+        )
         return reversion_urls + urls
-    
+
+    def diff_list(self, request, lhs_version, rhs_version):
+        versions = Version.objects.filter(pk__in=(int(lhs_version), int(rhs_version)))
+        if len(versions) != 2:
+            raise Http404()
+        info = reversion.revision.get_registration_info(self.model)
+        field_diff = [] 
+        lhs, rhs = versions
+        from reversion.helpers import generate_patch_html
+        opts = self.model._meta
+        for field_name in info.fields:
+            field_diff.append({
+                'field':opts.get_field_by_name(field_name)[0],
+                'patch':generate_patch_html(lhs, rhs, field_name),
+            }) 
+
+        context = {
+            'opts': opts,
+            'admin': self,
+            'app_label': opts.app_label,
+            'module_name': capfirst(opts.verbose_name),
+            'title': _("Compare versions of %(name)s") % {'name': force_unicode(opts.verbose_name_plural)},
+            'changelist_url': reverse('admin:%s_%s_changelist' % (opts.app_label, opts.module_name)),
+            'diff_list':field_diff,
+        }
+        return render_to_response(self.diff_view_template, context, template.RequestContext(request))
+ 
     def log_addition(self, request, object):
         """Sets the version meta information."""
         super(VersionAdmin, self).log_addition(request, object)
