@@ -5,10 +5,21 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core import serializers
 from django.db import models
-
+from reversion import fields
 import reversion
 from reversion.managers import VersionManager
 
+class ReversionUserManager(models.Manager):
+    def get_by_natural_key(self, *args):
+        return self.get(username=args[0])
+
+class ReversionUser(User):
+    objects = ReversionUserManager()
+    def natural_key(self):
+        return (self.username,)
+
+    class Meta:
+        proxy = True
 
 class Revision(models.Model):
     
@@ -17,7 +28,7 @@ class Revision(models.Model):
     date_created = models.DateTimeField(auto_now_add=True,
                                         help_text="The date and time this revision was created.")
 
-    user = models.ForeignKey(User,
+    user = fields.NaturalKey(ReversionUser,
                              blank=True,
                              null=True,
                              help_text="The user who created this revision.")
@@ -58,7 +69,7 @@ class Version(models.Model):
     
     object_id = models.TextField(help_text="Primary key of the model under version control.")
     
-    content_type = models.ForeignKey(ContentType,
+    content_type = fields.NaturalKey(ContentType,
                                      help_text="Content type of the model under version control.")
     
     format = models.CharField(max_length=255,
