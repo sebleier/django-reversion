@@ -80,6 +80,8 @@ class Version(models.Model):
     serialized_data = models.TextField(help_text="The serialized form of this version of the model.")
     
     object_repr = models.TextField(help_text="A string representation of the object.")
+
+    is_deleted = models.BooleanField(default=False)
     
     def get_object_version(self):
         """Returns the stored version of the model."""

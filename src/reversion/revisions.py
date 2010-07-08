@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core import serializers
 from django.db import models
 from django.db.models.query import QuerySet
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 
 from reversion.models import Revision, Version
 from reversion.storage import VersionFileStorageWrapper
@@ -112,6 +112,8 @@ class RevisionManager(object):
         self._registry[model_class] = registration_info
         # Connect to the post save signal of the model.
         post_save.connect(self.post_save_receiver, model_class)
+        post_delete.connect(self.post_delete_receiver, model_class)
+
     
     def get_registration_info(self, model_class):
         """Returns the registration information for the given model class."""
@@ -132,7 +134,8 @@ class RevisionManager(object):
             for field in registration_info.file_fields:
                 field.storage = field.storage.wrapped_storage
             post_save.disconnect(self.post_save_receiver, model_class)
-    
+            post_delete.disconnect(self.post_delete_receiver, model_class) 
+
     # Low-level revision management methods.
     
     def start(self):
@@ -280,6 +283,10 @@ class RevisionManager(object):
                                                format=registration_info.format,
                                                serialized_data=serialized_data,
                                                object_repr=unicode(obj))
+
+                        # unset deletions...
+                        Version.objects.filter(object_id=object_id, content_type=content_type, is_deleted=True).update(is_deleted=False)
+
                     for cls, kwargs in self._state.meta:
                         cls._default_manager.create(revision=revision, **kwargs)
             finally:
@@ -291,7 +298,18 @@ class RevisionManager(object):
         """Adds registered models to the current revision, if any."""
         if self.is_active():
             self.add(instance)
-       
+
+    def post_delete_receiver(self, instance, sender, **kwargs):
+        """Marks the latest version of an object as a deletion."""
+        content_type = ContentType.objects.get_for_model(sender)
+        object_id = instance.pk
+        try:
+            latest_version = Version.objects.filter(content_type=content_type, object_id=object_id).order_by('-revision__date_created')[0]
+            latest_version.is_deleted = True
+            latest_version.save()
+        except sender.DoesNotExist:
+            pass
+
     # High-level revision management methods.
         
     def __enter__(self):
