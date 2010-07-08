@@ -10,9 +10,10 @@ from django.contrib.admin import helpers
 from django.contrib.contenttypes.generic import GenericInlineModelAdmin, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.urlresolvers import reverse
+from django.core.paginator import Paginator, EmptyPage
 from django.forms.formsets import all_valid
 from django.forms.models import model_to_dict
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import get_object_or_404, render_to_response
 from django.utils.dateformat import format
 from django.utils.html import mark_safe
@@ -334,11 +335,29 @@ class VersionAdmin(admin.ModelAdmin):
     def history_view(self, request, object_id, extra_context=None):
         """Renders the history view."""
         opts = self.model._meta
-        action_list = [{"revision": version.revision,
+        try:
+            paginator = Paginator(Version.objects.get_for_object_reference(self.model, object_id).order_by('-revision__date_created'), 20)
+            page_no = int(request.GET.get('p', 0))
+            page = paginator.page(page_no+1)
+        except EmptyPage:
+            raise Http404()
+
+        attrs = {
+            'paginator':paginator,
+            'page_num':page_no,
+            'show_all':False,
+            'can_show_all':False,
+            'multi_page':True,
+            'get_query_string': lambda self, query : '?p=%(p)d' % query 
+        }
+
+        cl = type('HistoryChangeList', (object,), attrs)()
+
+        action_list = ({"revision": version.revision,
                         "url": reverse("admin:%s_%s_revision" % (opts.app_label, opts.module_name), args=(version.object_id, version.id))}
-                       for version in Version.objects.get_for_object_reference(self.model, object_id)]
+                       for version in page.object_list)
         # Compile the context.
-        context = {"action_list": action_list}
+        context = {"action_list": action_list, "cl":cl, }
         context.update(extra_context or {})
         return super(VersionAdmin, self).history_view(request, object_id, context)
     

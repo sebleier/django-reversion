@@ -10,11 +10,13 @@ import reversion
 from reversion.managers import VersionManager
 
 class ReversionUserManager(models.Manager):
+
     def get_by_natural_key(self, *args):
         return self.get(username=args[0])
 
 class ReversionUser(User):
     objects = ReversionUserManager()
+
     def natural_key(self):
         return (self.username,)
 
@@ -26,7 +28,7 @@ class Revision(models.Model):
     """A group of related object versions."""
     
     date_created = models.DateTimeField(auto_now_add=True,
-                                        help_text="The date and time this revision was created.")
+                                        help_text="The date and time this revision was created.", db_index=True)
 
     user = fields.NaturalKey(ReversionUser,
                              blank=True,
@@ -67,7 +69,7 @@ class Version(models.Model):
     revision = models.ForeignKey(Revision,
                                  help_text="The revision that contains this version.")
     
-    object_id = models.TextField(help_text="Primary key of the model under version control.")
+    object_id = models.TextField(help_text="Primary key of the model under version control.", db_index=True)
     
     content_type = fields.NaturalKey(ContentType,
                                      help_text="Content type of the model under version control.")

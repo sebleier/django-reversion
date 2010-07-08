@@ -1,4 +1,3 @@
-
 import sys
 import os
 import hashlib
@@ -27,10 +26,9 @@ class Command(BaseCommand):
         get_module_and_target = lambda x : x.rsplit('.', 1)
         def load_module_and_target(mod, target):
             module = import_module(mod)
-            target, fn = target.split(':')
+            target, pk = target.split(':')
             model = getattr(module, target)
-            target = getattr(model.objects, fn)
-            return model, target
+            return model, pk 
         models = [load_module_and_target(module, target) for module, target in (get_module_and_target(app) for app in apps)]
         number = int(options['number'])
         comment = hashlib.md5(str(datetime.datetime.now())).hexdigest()
@@ -39,11 +37,12 @@ class Command(BaseCommand):
         [revision.register(model) for model, creation in models]
 
         for i in range(number):
-            for model, creation in models:
+            for model, pk in models:
                 revision.start()
                 try:
                     revision.comment = comment
-                    creation()
+                    model = model.objects.get(pk=pk)
+                    model.save()
                     sys.stdout.write('.')
                 except:
                     revision.invalidate()
@@ -52,3 +51,4 @@ class Command(BaseCommand):
                     revision.end()
             sys.stdout.flush()
         print "finished."
+

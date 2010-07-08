@@ -225,6 +225,8 @@ class NaturalKey(ForeignKey):
     def __init__(self, to, *args, **kwargs):
         kwargs = {
             'verbose_name':kwargs.get('verbose_name', None),
+            'null':kwargs.get('null', None),
+            'blank':kwargs.get('blank', None),
             'rel': NaturalManyToOneRel(to,
                 related_name=kwargs.pop('related_name', None),
                 lookup_overrides=kwargs.pop('lookup_overrides', None),
