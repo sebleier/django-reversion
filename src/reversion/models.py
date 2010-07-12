@@ -26,6 +26,8 @@ class ReversionUser(User):
 class Revision(models.Model):
     
     """A group of related object versions."""
+
+    db_affinity = 'reversion'
     
     date_created = models.DateTimeField(auto_now_add=True,
                                         help_text="The date and time this revision was created.", db_index=True)
@@ -64,6 +66,7 @@ class Version(models.Model):
     
     """A saved version of a database model."""
     
+    db_affinity = 'reversion'
     objects = VersionManager()
     
     revision = models.ForeignKey(Revision,

@@ -1,14 +1,16 @@
 
 class ReversionRouter(object):
     def db_for_read(self, model, **hints):
-        if model._meta.app_label == 'reversion' and not model._meta.proxy:
-            return 'reversion'
+        affinity = getattr(model, 'db_affinity', None)
+        return affinity
 
     def db_for_write(self, model, **hints):
-        if model._meta.app_label == 'reversion' and not model._meta.proxy:
-            return 'reversion'
+        affinity = getattr(model, 'db_affinity', None)
+        return affinity
 
     def allow_syncdb(self, db, model):
-        if model._meta.app_label == 'reversion' and not model._meta.proxy:
-            return db == 'reversion'
-        return db == 'default' 
+        affinity = getattr(model, 'db_affinity', None)
+        if db == 'reversion':
+            return affinity == 'reversion'
+        if affinity == 'reversion':
+            return db == affinity
