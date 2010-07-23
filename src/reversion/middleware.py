@@ -1,7 +1,7 @@
 """Middleware used by Reversion."""
 
 
-import reversion
+from reversion.revisions import revision
 
 
 class RevisionMiddleware(object):
@@ -10,18 +10,18 @@ class RevisionMiddleware(object):
     
     def process_request(self, request):
         """Starts a new revision."""
-        reversion.revision.start()
+        revision.start()
         if request.user.is_authenticated():
-            reversion.revision.user = request.user
+            revision.user = request.user
         
     def process_response(self, request, response):
         """Closes the revision."""
-        while reversion.revision.is_active():
-            reversion.revision.end()
+        while revision.is_active():
+            revision.end()
         return response
         
     def process_exception(self, request, exception):
         """Closes the revision."""
-        reversion.revision.invalidate()
+        revision.invalidate()
         
         
