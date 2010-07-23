@@ -1,3 +1,4 @@
+from django.conf import settings
 
 class ReversionRouter(object):
     def db_for_read(self, model, **hints):
@@ -10,7 +11,5 @@ class ReversionRouter(object):
 
     def allow_syncdb(self, db, model):
         affinity = getattr(model, 'db_affinity', None)
-        if db == 'reversion':
-            return affinity == 'reversion'
-        if affinity == 'reversion':
-            return db == affinity
+        reversion_db = getattr(settings, 'REVERSION_DB', 'default')
+        return (db == reversion_db and affinity == reversion_db)
