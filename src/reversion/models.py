@@ -8,6 +8,7 @@ from django.db import models
 from reversion import fields
 import reversion
 from reversion.managers import VersionManager
+from django.conf import settings
 
 class ReversionUserManager(models.Manager):
 
@@ -23,19 +24,54 @@ class ReversionUser(User):
     class Meta:
         proxy = True
 
-class Revision(models.Model):
-    
-    """A group of related object versions."""
-
-    db_affinity = 'reversion'
-    
-    date_created = models.DateTimeField(auto_now_add=True,
-                                        help_text="The date and time this revision was created.", db_index=True)
-
+class RevisionNaturalKeyBase(models.Model):
     user = fields.NaturalKey(ReversionUser,
                              blank=True,
                              null=True,
                              help_text="The user who created this revision.")
+    class Meta:
+        abstract = True
+
+class RevisionForeignKeyBase(models.Model):
+    user = models.ForeignKey(User,
+                             blank=True,
+                             null=True,
+                             help_text="The user who created this revision.")
+    class Meta:
+        abstract = True
+    
+
+class VersionNaturalKeyBase(models.Model):
+    content_type = fields.NaturalKey(ContentType,
+                                     help_text="Content type of the model under version control.")
+    class Meta:
+        abstract = True
+
+class VersionForeignKeyBase(models.Model):
+    content_type = models.ForeignKey(ContentType,
+                                     help_text="Content type of the model under version control.")
+    class Meta:
+        abstract = True
+
+
+def get_revision_base():
+    if getattr(settings, 'REVERSION_USE_MULTI_DB', False):
+        return RevisionNaturalKeyBase
+    return RevisionForeignKeyBase
+
+def get_version_base():
+    if getattr(settings, 'REVERSION_USE_MULTI_DB', False):
+        return VersionNaturalKeyBase
+    return VersionForeignKeyBase
+
+class Revision(get_revision_base()):
+    
+    """A group of related object versions."""
+
+    db_affinity = getattr(settings, 'REVERSION_DB', 'default') 
+    
+    date_created = models.DateTimeField(auto_now_add=True,
+                                        help_text="The date and time this revision was created.", db_index=True)
     
     comment = models.TextField(blank=True,
                                help_text="A text comment on this revision.")
@@ -62,20 +98,17 @@ class Revision(models.Model):
                            for version in self.version_set.all()])
             
 
-class Version(models.Model):
+class Version(get_version_base()):
     
     """A saved version of a database model."""
     
-    db_affinity = 'reversion'
+    db_affinity = getattr(settings, 'REVERSION_DB', 'default') 
     objects = VersionManager()
     
     revision = models.ForeignKey(Revision,
                                  help_text="The revision that contains this version.")
     
     object_id = models.TextField(help_text="Primary key of the model under version control.", db_index=True)
-    
-    content_type = fields.NaturalKey(ContentType,
-                                     help_text="Content type of the model under version control.")
     
     format = models.CharField(max_length=255,
                               help_text="The serialization format used by this model.")
