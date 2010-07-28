@@ -1,5 +1,11 @@
 from distutils.core import setup
 
+if sys.argv[-1] == 'develop':
+    current_dir = os.path.dirname(__file__)
+    src = os.path.join(current_dir, 'src', 'reversion')
+    dst = os.path.join(current_dir, 'reversion')
+    if not os.path.exists(dst):
+        os.symlink(src, dst)
 
 setup(name="django-reversion",
       version="1.3.1",
