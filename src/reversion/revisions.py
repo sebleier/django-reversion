@@ -307,7 +307,7 @@ class RevisionManager(object):
             latest_version = Version.objects.filter(content_type=content_type, object_id=object_id).order_by('-revision__date_created')[0]
             latest_version.is_deleted = True
             latest_version.save()
-        except sender.DoesNotExist:
+        except (sender.DoesNotExist, IndexError):
             pass
 
     # High-level revision management methods.
