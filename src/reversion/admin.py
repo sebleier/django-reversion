@@ -178,9 +178,10 @@ class VersionAdmin(admin.ModelAdmin):
                 prefixes[prefix] = prefixes.get(prefix, 0) + 1
                 if prefixes[prefix] != 1:
                     prefix = "%s-%s" % (prefix, prefixes[prefix])
-                formset = FormSet(request.POST, request.FILES,
+                formset = type('NoExtra', (FormSet,), {'extra':0})(request.POST, request.FILES,
                                   instance=new_object, prefix=prefix,
                                   queryset=inline.queryset(request))
+
                 formsets.append(formset)
             if all_valid(formsets) and form_validated:
                 self.save_model(request, new_object, form, change=True)
@@ -206,13 +207,6 @@ class VersionAdmin(admin.ModelAdmin):
             prefixes = {}
             revision_versions = version.revision.version_set.all()
             for FormSet, inline in zip(self.get_formsets(request, obj), self.inline_instances):
-                # This code is standard for creating the formset.
-                prefix = FormSet.get_default_prefix()
-                prefixes[prefix] = prefixes.get(prefix, 0) + 1
-                if prefixes[prefix] != 1:
-                    prefix = "%s-%s" % (prefix, prefixes[prefix])
-                formset = FormSet(instance=obj, prefix=prefix,
-                                  queryset=inline.queryset(request))
                 # Now we hack it to push in the data from the revision!
                 try:
                     fk_name = FormSet.fk.name
@@ -223,6 +217,14 @@ class VersionAdmin(admin.ModelAdmin):
                                          for related_version in revision_versions
                                          if related_version.content_type.model_class() == FormSet.model
                                          and unicode(related_version.field_dict[fk_name]) == unicode(object_id)])
+
+                # This code is standard for creating the formset.
+                prefix = FormSet.get_default_prefix()
+                prefixes[prefix] = prefixes.get(prefix, 0) + 1
+                if prefixes[prefix] != 1:
+                    prefix = "%s-%s" % (prefix, prefixes[prefix])
+                formset = type('NoExtra', (FormSet,), {'extra':len(related_versions)})(instance=obj, prefix=prefix,
+                                  queryset=inline.queryset(request))
                 initial = []
                 for related_obj in formset.queryset:
                     if unicode(related_obj.pk) in related_versions:
