@@ -164,7 +164,7 @@ class VersionAdmin(admin.ModelAdmin):
         if request.method == "POST":
             # This section is copied directly from the model admin change view
             # method.  Maybe one day there will be a hook for doing this better.
-            form = ModelForm(request.POST, request.FILES, instance=obj, initial=self.get_revision_form_data(request, obj, version))
+            form = ModelForm(data=request.POST, files=request.FILES, instance=obj, initial=self.get_revision_form_data(request, obj, version))
             if form.is_valid():
                 form_validated = True
                 new_object = self.save_form(request, form, change=True)
@@ -185,7 +185,10 @@ class VersionAdmin(admin.ModelAdmin):
                 formsets.append(formset)
             if all_valid(formsets) and form_validated:
                 self.save_model(request, new_object, form, change=True)
-                form.save_m2m()
+
+                if hasattr(form, 'save_m2m'):
+                    form.save_m2m()
+
                 for formset in formsets:
                     self.save_formset(request, form, formset, change=True)
                 change_message = _(u"Reverted to previous version, saved on %(datetime)s") % {"datetime": format(version.revision.date_created, _(settings.DATETIME_FORMAT))}
