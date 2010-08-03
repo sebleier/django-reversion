@@ -1,6 +1,7 @@
 from distutils.core import setup
+import os, sys
 
-if sys.argv[-1] == 'develop':
+if sys.argv[-1] in ('develop', 'egg_info'):
     current_dir = os.path.dirname(__file__)
     src = os.path.join(current_dir, 'src', 'reversion')
     dst = os.path.join(current_dir, 'reversion')
