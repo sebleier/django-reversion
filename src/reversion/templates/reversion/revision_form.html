@@ -14,6 +14,17 @@
 		<a href="../">{% trans "History" %}</a> &rsaquo;
 		{% blocktrans with opts.verbose_name as verbose_name %}Revert {{verbose_name}}{% endblocktrans %}
 	</div>
+    <script type="text/javascript">
+        (function($) {
+            $(function() {
+                $('.related-lookup').each(function() {
+                    var href= $(this).attr('href');
+                    href = '../../'+href;
+                    $(this).attr('href', href);
+                });
+            });
+        })(django.jQuery);
+    </script>
 {% endblock %}
 
 
