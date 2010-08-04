@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
-import reversion
+from reversion.revisions import revision
 from reversion.models import Revision, Version 
 import random
 import datetime
@@ -8,7 +8,7 @@ import datetime
 class TestOfManager(TestCase):
     def tearDown(self):
         try:
-            reversion.unregister(User)
+            revision.unregister(User)
         except:
             pass
 
@@ -18,11 +18,16 @@ class TestOfManager(TestCase):
             email='admin@admin.com',
         )
         random_number_of_versions = random.randint(1, 100)
-        reversion.register(User)
+        revision.register(User)
         for i in range(random_number_of_versions):
-            with reversion.revision:
+            try:
+                revision.start()
                 user.username = 'random-%d' % i
                 user.save()
+            except:
+                revision.invalidate()
+            finally:
+                revision.end()
         versions = Version.objects.get_for_object_reference(User, user.pk)
         self.assertEqual(len(versions), random_number_of_versions)
 
@@ -32,11 +37,16 @@ class TestOfManager(TestCase):
             email='admin@admin.com',
         )
         random_number_of_versions = random.randint(1, 100)
-        reversion.register(User)
+        revision.register(User)
         for i in range(random_number_of_versions):
-            with reversion.revision:
+            try:
+                revision.start()
                 user.username = 'random-%d' % i
                 user.save()
+            except:
+                revision.invalidate()
+            finally:
+                revision.end()
         versions = Version.objects.get_for_object(user)
         self.assertEqual(len(versions), random_number_of_versions)
 
@@ -48,17 +58,27 @@ class TestOfManager(TestCase):
 
         # make sure the random number is evenly divisible
         random_number_of_versions = abs(random.randint(2, 50) & (~0<<1)) 
-        reversion.register(User)
+        revision.register(User)
         user = User.objects.get(email='admin@admin.com')
         for i in range(random_number_of_versions/2):
-            with reversion.revision:
+            try:
+                revision.start()
                 user.username = 'sequential-%d' % i
                 user.save()
+            except:
+                revision.invalidate()
+            finally:
+                revision.end()
 
         for i in range(random_number_of_versions/2, 0, -1):
-            with reversion.revision:
+            try:
+                revision.start()
                 user.username = 'sequential-%d' % i
                 user.save()
+            except:
+                revision.invalidate()
+            finally:
+                revision.end()
 
         versions = Version.objects.get_unique_for_object(user)
         self.assertEqual(len(versions), random_number_of_versions)
@@ -67,15 +87,20 @@ class TestOfManager(TestCase):
         user = User.objects.create(
             username='rand-%d' % random.randint(1, 100),
         )
-        reversion.register(User)
+        revision.register(User)
         self.assertRaises(Version.DoesNotExist, Version.objects.get_for_date, user, datetime.datetime.now()) 
 
     def test_get_for_date_returns_version_if_one_is_available(self):
-        reversion.register(User)
-        with reversion.revision:
+        revision.register(User)
+        try:
+            revision.start()
             user = User.objects.create(
                 username='rand-%d' % random.randint(1, 100),
             )
+        except:
+            revision.invalidate()
+        finally:
+            revision.end()
         now = datetime.datetime.now()
         version = Version.objects.get_for_date(user, now) 
         self.assertTrue(version.revision.date_created <= now) 
@@ -86,33 +111,53 @@ class TestOfManager(TestCase):
         )
         pk = user.pk
         user.delete()
-        reversion.register(User)
+        revision.register(User)
         self.assertRaises(Version.DoesNotExist, Version.objects.get_deleted_object, User, pk) 
 
     def test_get_deleted_object_returns_version_if_one_is_available(self):
-        reversion.register(User)
+        revision.register(User)
         pk = None
-        with reversion.revision:
+        try:
+            revision.start()
             user = User.objects.create(
                 username='rand-%d' % random.randint(1, 100),
             )
             pk = user.pk
-        with reversion.revision:
+        except:
+            revision.invalidate()
+        finally:
+            revision.end()
+        try:
+            revision.start()
             user.delete()
+        except:
+            revision.invalidate()
+        finally:
+            revision.end()
         version = Version.objects.get_deleted_object(User, pk)
         self.assertEqual(version.object_version.object.pk, pk) 
 
     def test_get_deleted_returns_appropriate_list_of_deleted_objects_for_model(self):
-        reversion.register(User)
+        revision.register(User)
         random_number_of_users = random.randint(1, 100)
         for i in range(random_number_of_users):
             user = None
-            with reversion.revision:
+            try:
+                revision.start()
                 user = User.objects.create(
                     username='sequential-%d' % i
                 )
-        with reversion.revision:
+            except:
+                revision.invalidate()
+            finally:
+                revision.end()
+        try:
+            revision.start()
             User.objects.all().delete()
+        except:
+            revision.invalidate()
+        finally:
+            revision.end()
 
         deleted = Version.objects.get_deleted(User)
         self.assertEqual(len(deleted), random_number_of_users)

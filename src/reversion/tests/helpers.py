@@ -9,7 +9,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.sites.models import Site
 from django.db import models, transaction
 
-import reversion
+from reversion.revisions import revision
 from reversion.admin import VersionAdmin
 from reversion.helpers import patch_admin
 from reversion.models import Version, Revision
@@ -27,12 +27,24 @@ else:
         
         def setUp(self):
             """Sets up a versioned site model to test."""
-            reversion.register(Site)
-            with reversion.revision:
+            revision.register(Site)
+            try:
+                revision.start()
                 site = Site.objects.create(name="site", domain="www.site-rev-1.com")
-            with reversion.revision:
+            except:
+                revision.invalidate()
+            finally:
+                revision.end()
+
+            try:
+                revision.start()
                 site.domain = "www.site-rev-2.com"
                 site.save()
+            except:
+                revision.invalidate()
+            finally:
+                revision.end()
+
             self.site = site
         
         def testCanGeneratePatch(self):
@@ -46,7 +58,7 @@ else:
         
         def tearDown(self):
             """Deletes the versioned site model."""
-            reversion.unregister(Site)
+            revision.unregister(Site)
             self.site.delete()
             Version.objects.all().delete()
             
