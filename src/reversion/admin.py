@@ -211,6 +211,8 @@ class VersionAdmin(admin.ModelAdmin):
             revision_versions = version.revision.version_set.all()
             for FormSet, inline in zip(self.get_formsets(request, obj), self.inline_instances):
                 # Now we hack it to push in the data from the revision!
+
+
                 try:
                     fk_name = FormSet.fk.name
                 except AttributeError:
@@ -221,12 +223,16 @@ class VersionAdmin(admin.ModelAdmin):
                                          if related_version.content_type.model_class() == FormSet.model
                                          and unicode(related_version.field_dict[fk_name]) == unicode(object_id)])
 
+
+                pks = set([unicode(o.pk) for o in inline.model._default_manager.complex_filter({fk_name:obj}).all()])
+                other_pks = set([unicode(i) for i in related_versions])
+
                 # This code is standard for creating the formset.
                 prefix = FormSet.get_default_prefix()
                 prefixes[prefix] = prefixes.get(prefix, 0) + 1
                 if prefixes[prefix] != 1:
                     prefix = "%s-%s" % (prefix, prefixes[prefix])
-                formset = type('NoExtra', (FormSet,), {'extra':len(related_versions)})(instance=obj, prefix=prefix,
+                formset = type('NoExtra', (FormSet,), {'extra':len(other_pks.difference(pks))})(instance=obj, prefix=prefix,
                                   queryset=inline.queryset(request))
                 initial = []
                 for related_obj in formset.queryset:
