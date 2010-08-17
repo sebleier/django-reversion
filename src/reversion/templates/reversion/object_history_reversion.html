@@ -3,6 +3,14 @@
 {% block extrahead %}<link rel="stylesheet" href="/media/css/changelists.css" />{% endblock %}
 
 {% block content %}
+{% block object-tools %}
+    <ul class="object-tools">
+        {% if not is_popup %}
+            <li><a href="?use_reversion=false" class="recoverlink">{% blocktrans %}Older History{% endblocktrans %}</a></li>
+        {% endif %}
+    </ul>
+{% endblock %}
+
 	<div id="content-main">
 	
 		<p>{% blocktrans %}Choose a date from the list below to revert to a previous version of this object.{% endblocktrans %}</p>

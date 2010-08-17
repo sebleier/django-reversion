@@ -347,7 +347,9 @@ class VersionAdmin(admin.ModelAdmin):
     def history_view(self, request, object_id, extra_context=None):
         """Renders the history view.""" 
         available_versions = Version.objects.get_for_object_reference(self.model, object_id).order_by('-revision__date_created')
-        if len(available_versions) == 0: # no versions available inside of reversion. Fall back to the default history view displaying admin log entries.
+        if len(available_versions) == 0 or request.GET.get('use_reversion', 'true').lower() != 'true':
+            # either no versions are available inside of reversion or the user is requesting pre-reversion
+            # data. Fall back to the default history view displaying admin log entries.
             extra_context = extra_context or dict()
             extra_context['use_template'] = 'admin/object_history.html'
             return super(VersionAdmin, self).history_view(request, object_id, extra_context)
