@@ -345,7 +345,13 @@ class VersionAdmin(admin.ModelAdmin):
         return super(VersionAdmin, self).changelist_view(request, context)
     
     def history_view(self, request, object_id, extra_context=None):
-        """Renders the history view."""
+        """Renders the history view.""" 
+        available_versions = Version.objects.get_for_object_reference(self.model, object_id).order_by('-revision__date_created')
+        if len(available_versions) == 0: # no versions available inside of reversion. Fall back to the default history view displaying admin log entries.
+            extra_context = extra_context or dict()
+            extra_context['use_template'] = 'admin/object_history.html'
+            return super(VersionAdmin, self).history_view(request, object_id, extra_context)
+
         opts = self.model._meta
         try:
             paginator = Paginator(Version.objects.get_for_object_reference(self.model, object_id).order_by('-revision__date_created'), 20)
@@ -369,7 +375,7 @@ class VersionAdmin(admin.ModelAdmin):
                         "url": reverse("admin:%s_%s_revision" % (opts.app_label, opts.module_name), args=(version.object_id, version.id))}
                        for version in page.object_list)
         # Compile the context.
-        context = {"action_list": action_list, "cl":cl, }
+        context = {"action_list": action_list, "cl":cl, "use_template": 'reversion/object_history_reversion.html'}
         context.update(extra_context or {})
         return super(VersionAdmin, self).history_view(request, object_id, context)
     
