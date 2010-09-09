@@ -192,6 +192,17 @@ class VersionAdmin(admin.ModelAdmin):
                 for formset in formsets:
                     self.save_formset(request, form, formset, change=True)
                 change_message = _(u"Reverted to previous version, saved on %(datetime)s") % {"datetime": format(version.revision.date_created, _(settings.DATETIME_FORMAT))}
+
+                try:
+                    extra_changed = self.construct_change_message(request, form, formsets)
+                    if extra_changed == _('No fields changed.'):
+                        extra_changed = ''
+                    else:
+                        extra_changed = '. %s' % extra_changed
+                    change_message += extra_changed
+                except:
+                    pass
+
                 self.log_change(request, new_object, change_message)
                 self.message_user(request, _(u'The %(model)s "%(name)s" was reverted successfully. You may edit it again below.') % {"model": force_unicode(opts.verbose_name), "name": unicode(obj)})
                 # Redirect to the model change form.
